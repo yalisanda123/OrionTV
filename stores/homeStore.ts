@@ -52,7 +52,7 @@ const initialCategories: Category[] = [
     ],
   },
   { title: "综艺", type: "tv", tag: "综艺" },
-  { title: "短剧", type: "tv", tag: "短剧" },
+  { title: "短剧", type: "tv", tags: ["全部", "逆袭", "战神", "穿越", "总裁", "神医", "重生", "甜宠", "古装", "都市", "悬疑", "玄幻", "家庭", "萌宝"] },
   { title: "豆瓣 Top250", type: "movie", tag: "top250" },
 ];
 
@@ -174,9 +174,32 @@ const useHomeStore = create<HomeState>((set, get) => ({
         set({ contentData: rowItems, hasMore: false });
       } else if (selectedCategory.type && selectedCategory.tag) {
         if (selectedCategory.title === "短剧") {
-          // 短剧分类：聚合搜索各源（含短剧-量子专线），以电视墙展示
+          // 短剧分类：聚合搜索各源（含短剧-量子专线 15 万部），按子分类关键词本地过滤
+          const SHORT_DRAMA_TAG_KEYWORDS: Record<string, string[]> = {
+            "逆袭": ["逆袭", "崛起", "翻身", "复仇", "逆天"],
+            "战神": ["战神", "龙王", "兵王", "至尊", "无敌", "特工"],
+            "穿越": ["穿越", "重生", "回到", "开局"],
+            "总裁": ["总裁", "豪门", "霸总", "契约", "首富"],
+            "神医": ["神医", "医圣", "国医", "药王", "医术"],
+            "甜宠": ["甜宠", "宠妻", "恋爱", "心动", "闪婚", "老公"],
+            "古装": ["古装", "王爷", "皇后", "太子", "将军", "公主", "贵妃"],
+            "都市": ["都市", "城市"],
+            "悬疑": ["悬疑", "谜案", "侦探", "刑侦", "真相"],
+            "玄幻": ["玄幻", "修仙", "仙帝", "魔尊", "修真", "神豪"],
+            "家庭": ["家庭", "婆媳", "亲情", "婚姻", "回家"],
+            "萌宝": ["萌宝", "宝贝", "萌娃", "儿女", "小棉袄"],
+          };
+
           const result = await api.searchVideos("短剧");
-          const newItems = result.results.map((item) => ({
+          let results = result.results;
+          const tag = selectedCategory.tag;
+          if (tag && tag !== "全部" && SHORT_DRAMA_TAG_KEYWORDS[tag]) {
+            const kws = SHORT_DRAMA_TAG_KEYWORDS[tag];
+            results = results.filter((item) =>
+              kws.some((k) => (item.title || "").includes(k))
+            );
+          }
+          const newItems = results.map((item) => ({
             ...item,
             id: String(item.id ?? item.title),
             source: item.source,
