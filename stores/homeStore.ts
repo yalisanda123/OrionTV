@@ -206,7 +206,7 @@ const useHomeStore = create<HomeState>((set, get) => ({
             sourceName: item.source_name,
             title: item.title,
             poster: item.poster,
-            year: item.year,
+            year: item.year === "unknown" ? "" : item.year,
           })) as RowItem[];
           set({
             contentData: newItems,
