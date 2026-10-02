@@ -52,6 +52,7 @@ const initialCategories: Category[] = [
     ],
   },
   { title: "综艺", type: "tv", tag: "综艺" },
+  { title: "短剧", type: "tv", tag: "短剧" },
   { title: "豆瓣 Top250", type: "movie", tag: "top250" },
 ];
 
@@ -172,74 +173,93 @@ const useHomeStore = create<HomeState>((set, get) => ({
 
         set({ contentData: rowItems, hasMore: false });
       } else if (selectedCategory.type && selectedCategory.tag) {
-        const result = await api.getDoubanData(
-          selectedCategory.type,
-          selectedCategory.tag,
-          20,
-          pageStart
-        );
-
-        const newItems = result.list.map((item) => ({
-          ...item,
-          id: item.title,
-          source: "douban",
-        })) as RowItem[];
-
-        const cacheKey = getCacheKey(selectedCategory);
-
-        if (pageStart === 0) {
-          // 清理过期缓存
-          for (const [key, value] of dataCache.entries()) {
-            if (!isValidCache(value)) {
-              dataCache.delete(key);
-            }
-          }
-
-          // 如果缓存太大，删除最旧的项
-          if (dataCache.size >= MAX_CACHE_SIZE) {
-            const oldestKey = Array.from(dataCache.keys())[0];
-            dataCache.delete(oldestKey);
-          }
-
-          // 限制缓存的数据条目数，但不限制显示的数据
-          const cacheItems = newItems.slice(0, MAX_ITEMS_PER_CACHE);
-
-          // 存储新缓存
-          dataCache.set(cacheKey, {
-            data: cacheItems,
-            timestamp: Date.now(),
-            type: selectedCategory.type,
-            hasMore: true // 始终为 true，因为我们允许继续加载
-          });
-
+        if (selectedCategory.title === "短剧") {
+          // 短剧分类：聚合搜索各源（含短剧-量子专线），以电视墙展示
+          const result = await api.searchVideos("短剧");
+          const newItems = result.results.map((item) => ({
+            ...item,
+            id: String(item.id ?? item.title),
+            source: item.source,
+            sourceName: item.source_name,
+            title: item.title,
+            poster: item.poster,
+            year: item.year,
+          })) as RowItem[];
           set({
-            contentData: newItems, // 使用完整的新数据
+            contentData: newItems,
             pageStart: newItems.length,
-            hasMore: result.list.length !== 0,
+            hasMore: false,
           });
         } else {
-          // 增量加载时更新缓存
-          const existingCache = dataCache.get(cacheKey);
-          if (existingCache) {
-            // 只有当缓存数据少于最大限制时才更新缓存
-            if (existingCache.data.length < MAX_ITEMS_PER_CACHE) {
-              const updatedData = [...existingCache.data, ...newItems];
-              const limitedCacheData = updatedData.slice(0, MAX_ITEMS_PER_CACHE);
+          const result = await api.getDoubanData(
+            selectedCategory.type,
+            selectedCategory.tag,
+            20,
+            pageStart
+          );
 
-              dataCache.set(cacheKey, {
-                ...existingCache,
-                data: limitedCacheData,
-                hasMore: true // 始终为 true，因为我们允许继续加载
-              });
+          const newItems = result.list.map((item) => ({
+            ...item,
+            id: item.title,
+            source: "douban",
+          })) as RowItem[];
+
+          const cacheKey = getCacheKey(selectedCategory);
+
+          if (pageStart === 0) {
+            // 清理过期缓存
+            for (const [key, value] of dataCache.entries()) {
+              if (!isValidCache(value)) {
+                dataCache.delete(key);
+              }
             }
-          }
 
-          // 更新状态时使用所有数据
-          set((state) => ({
-            contentData: [...state.contentData, ...newItems],
-            pageStart: state.pageStart + newItems.length,
-            hasMore: result.list.length !== 0,
-          }));
+            // 如果缓存太大，删除最旧的项
+            if (dataCache.size >= MAX_CACHE_SIZE) {
+              const oldestKey = Array.from(dataCache.keys())[0];
+              dataCache.delete(oldestKey);
+            }
+
+            // 限制缓存的数据条目数，但不限制显示的数据
+            const cacheItems = newItems.slice(0, MAX_ITEMS_PER_CACHE);
+
+            // 存储新缓存
+            dataCache.set(cacheKey, {
+              data: cacheItems,
+              timestamp: Date.now(),
+              type: selectedCategory.type,
+              hasMore: true // 始终为 true，因为我们允许继续加载
+            });
+
+            set({
+              contentData: newItems, // 使用完整的新数据
+              pageStart: newItems.length,
+              hasMore: result.list.length !== 0,
+            });
+          } else {
+            // 增量加载时更新缓存
+            const existingCache = dataCache.get(cacheKey);
+            if (existingCache) {
+              // 只有当缓存数据少于最大限制时才更新缓存
+              if (existingCache.data.length < MAX_ITEMS_PER_CACHE) {
+                const updatedData = [...existingCache.data, ...newItems];
+                const limitedCacheData = updatedData.slice(0, MAX_ITEMS_PER_CACHE);
+
+                dataCache.set(cacheKey, {
+                  ...existingCache,
+                  data: limitedCacheData,
+                  hasMore: true // 始终为 true，因为我们允许继续加载
+                });
+              }
+            }
+
+            // 更新状态时使用所有数据
+            set((state) => ({
+              contentData: [...state.contentData, ...newItems],
+              pageStart: state.pageStart + newItems.length,
+              hasMore: result.list.length !== 0,
+            }));
+          }
         }
       } else if (selectedCategory.tags) {
         // It's a container category, do not load content, but clear current content
