@@ -190,8 +190,6 @@ const useHomeStore = create<HomeState>((set, get) => ({
             "萌宝": ["萌宝", "宝贝", "萌娃", "儿女", "小棉袄"],
           };
 
-          const result = await api.searchVideos("短剧");
-          let results = result.results;
           const tag = selectedCategory.tag;
 
           // 权威热播榜（WETRUE日榜，服务端静态 draman-rank.json）
@@ -209,17 +207,26 @@ const useHomeStore = create<HomeState>((set, get) => ({
           const matchRankName = (title: string, name: string) =>
             title.includes(name) || name.includes(title);
 
+          let results: SearchResult[] = [];
           if (tag === "🔥热播榜") {
-            // 权威榜：按榜序匹配搜索结果的剧（未命中的榜单剧不显示）
-            const ranked: typeof results = [];
-            for (const r of rankList) {
-              const hit = results.find((item) =>
-                matchRankName(item.title || "", r.name)
-              );
-              if (hit) ranked.push(hit);
-            }
-            results = ranked;
+            // 权威榜：并发搜索 Top20 榜单剧（各剧取首个结果，按榜序展示）
+            const ranked = (
+              await Promise.all(
+                rankList.slice(0, 20).map(async (r) => {
+                  try {
+                    const res = await api.searchVideos(r.name);
+                    const hit = res.results && res.results[0];
+                    return hit ? { ...hit, rankName: r.name, heat: r.heat } : null;
+                  } catch {
+                    return null;
+                  }
+                })
+              )
+            ).filter((x): x is NonNullable<typeof x> => x !== null);
+            results = ranked as SearchResult[];
           } else {
+            const result = await api.searchVideos("短剧");
+            results = result.results;
             // 全部/题材：榜单剧优先排序，其余补位
             if (tag && tag !== "全部" && SHORT_DRAMA_TAG_KEYWORDS[tag]) {
               const kws = SHORT_DRAMA_TAG_KEYWORDS[tag];
