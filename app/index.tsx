@@ -138,7 +138,14 @@ export default function HomeScreen() {
   }, [loading, contentData.length, fadeAnim]);
 
   const handleCategorySelect = (category: Category) => {
-    setSelectedTag(null);
+    // 容器分类：直接带默认 tag（消除「请选择一个子分类」空态闪烁）
+    if (category.tags && category.tags.length > 0 && !category.tag) {
+      const defaultTag = category.tags[0];
+      setSelectedTag(defaultTag);
+      selectCategory({ ...category, tag: defaultTag });
+      return;
+    }
+    setSelectedTag(category.tag || null);
     selectCategory(category);
   };
 

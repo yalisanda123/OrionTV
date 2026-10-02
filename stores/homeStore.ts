@@ -52,7 +52,7 @@ const initialCategories: Category[] = [
     ],
   },
   { title: "综艺", type: "tv", tag: "综艺" },
-  { title: "短剧", type: "tv", tags: ["🔥热播榜", "全部", "逆袭", "战神", "穿越", "总裁", "神医", "重生", "甜宠", "古装", "都市", "悬疑", "玄幻", "家庭", "萌宝"] },
+  { title: "短剧", type: "tv", tags: ["🔥热播榜", "🍅红果热剧", "全部", "逆袭", "战神", "穿越", "总裁", "神医", "重生", "甜宠", "古装", "都市", "悬疑", "玄幻", "家庭", "萌宝"] },
   { title: "豆瓣 Top250", type: "movie", tag: "top250" },
 ];
 
@@ -208,7 +208,25 @@ const useHomeStore = create<HomeState>((set, get) => ({
             title.includes(name) || name.includes(title);
 
           let results: SearchResult[] = [];
-          if (tag === "🔥热播榜") {
+          if (tag === "🍅红果热剧") {
+            // 红果官方热剧：红果官网聚合（发现层），点击后详情按剧名搜可播源
+            try {
+              const res = await fetch(`${api.baseURL.replace(/\/$/, "")}/api/hongguo?action=home`);
+              if (res.ok) {
+                const d = await res.json();
+                results = ((d.list || []) as any[]).map((x) => ({
+                  title: x.series_name,
+                  poster: x.cover,
+                  id: String(x.series_id),
+                  source: "hongguo",
+                  source_name: "红果",
+                  year: "",
+                })) as unknown as SearchResult[];
+              }
+            } catch {
+              results = [];
+            }
+          } else if (tag === "🔥热播榜") {
             // 权威榜：并发搜索 Top10 榜单剧（分两批×5，避免同时 20 请求导致 TV 卡顿）
             const top10 = rankList.slice(0, 10);
             const ranked: SearchResult[] = [];
