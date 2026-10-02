@@ -97,7 +97,7 @@ const dataCache = new Map<string, CacheItem>();
 
 const useHomeStore = create<HomeState>((set, get) => ({
   categories: initialCategories,
-  selectedCategory: initialCategories[0],
+  selectedCategory: initialCategories[1], // 默认「热门剧集」（最近播放可能为空，避免进 APP 白屏）
   contentData: [],
   loading: true,
   loadingMore: false,
@@ -209,24 +209,30 @@ const useHomeStore = create<HomeState>((set, get) => ({
 
           let results: SearchResult[] = [];
           if (tag === "🔥热播榜") {
-            // 权威榜：并发搜索 Top20 榜单剧（各剧取首个结果，按榜序展示）
-            const ranked = (
-              await Promise.all(
-                rankList.slice(0, 20).map(async (r) => {
-                  try {
-                    const res = await api.searchVideos(r.name);
-                    const hit = res.results && res.results[0];
-                    return hit ? { ...hit, rankName: r.name, heat: r.heat } : null;
-                  } catch {
-                    return null;
-                  }
-                })
-              )
-            ).filter((x): x is NonNullable<typeof x> => x !== null);
-            results = ranked as SearchResult[];
+            // 权威榜：并发搜索 Top10 榜单剧（分两批×5，避免同时 20 请求导致 TV 卡顿）
+            const top10 = rankList.slice(0, 10);
+            const ranked: SearchResult[] = [];
+            for (let batch = 0; batch < top10.length; batch += 5) {
+              const part = (
+                await Promise.all(
+                  top10.slice(batch, batch + 5).map(async (r) => {
+                    try {
+                      const res = await api.searchVideos(r.name);
+                      const hit = res.results && res.results[0];
+                      return hit ? { ...hit, rankName: r.name, heat: r.heat } : null;
+                    } catch {
+                      return null;
+                    }
+                  })
+                )
+              ).filter((x): x is NonNullable<typeof x> => x !== null);
+              ranked.push(...(part as SearchResult[]));
+            }
+            results = ranked;
           } else {
             const result = await api.searchVideos("短剧");
-            results = result.results;
+            // 限量渲染：536 条全量一次性渲染会卡顿 TV，只取前 80
+            results = result.results.slice(0, 80);
             // 全部/题材：榜单剧优先排序，其余补位
             if (tag && tag !== "全部" && SHORT_DRAMA_TAG_KEYWORDS[tag]) {
               const kws = SHORT_DRAMA_TAG_KEYWORDS[tag];
