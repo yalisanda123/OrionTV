@@ -52,7 +52,7 @@ const initialCategories: Category[] = [
     ],
   },
   { title: "综艺", type: "tv", tag: "综艺" },
-  { title: "短剧", type: "tv", tags: ["全部", "逆袭", "战神", "穿越", "总裁", "神医", "重生", "甜宠", "古装", "都市", "悬疑", "玄幻", "家庭", "萌宝"] },
+  { title: "短剧", type: "tv", tags: ["🔥热播榜", "全部", "逆袭", "战神", "穿越", "总裁", "神医", "重生", "甜宠", "古装", "都市", "悬疑", "玄幻", "家庭", "萌宝"] },
   { title: "豆瓣 Top250", type: "movie", tag: "top250" },
 ];
 
@@ -193,11 +193,55 @@ const useHomeStore = create<HomeState>((set, get) => ({
           const result = await api.searchVideos("短剧");
           let results = result.results;
           const tag = selectedCategory.tag;
-          if (tag && tag !== "全部" && SHORT_DRAMA_TAG_KEYWORDS[tag]) {
-            const kws = SHORT_DRAMA_TAG_KEYWORDS[tag];
-            results = results.filter((item) =>
-              kws.some((k) => (item.title || "").includes(k))
-            );
+
+          // 权威热播榜（WETRUE日榜，服务端静态 draman-rank.json）
+          let rankList: { name: string; heat: number }[] = [];
+          try {
+            const res = await fetch(`${api.baseURL.replace(/\/$/, "")}/draman-rank.json`);
+            if (res.ok) {
+              const d = await res.json();
+              rankList = (d.list || []).map((x: any) => ({ name: x.name, heat: x.heat }));
+            }
+          } catch {
+            // 榜单拉取失败则退化为普通列表
+          }
+
+          const matchRankName = (title: string, name: string) =>
+            title.includes(name) || name.includes(title);
+
+          if (tag === "🔥热播榜") {
+            // 权威榜：按榜序匹配搜索结果的剧（未命中的榜单剧不显示）
+            const ranked: typeof results = [];
+            for (const r of rankList) {
+              const hit = results.find((item) =>
+                matchRankName(item.title || "", r.name)
+              );
+              if (hit) ranked.push(hit);
+            }
+            results = ranked;
+          } else {
+            // 全部/题材：榜单剧优先排序，其余补位
+            if (tag && tag !== "全部" && SHORT_DRAMA_TAG_KEYWORDS[tag]) {
+              const kws = SHORT_DRAMA_TAG_KEYWORDS[tag];
+              results = results.filter((item) =>
+                kws.some((k) => (item.title || "").includes(k))
+              );
+            }
+            if (tag === "全部" && rankList.length > 0) {
+              const order = new Map(rankList.map((r, i) => [r.name, i]));
+              results = [...results].sort((a, b) => {
+                const ia = rankList.findIndex((r) =>
+                  matchRankName(a.title || "", r.name)
+                );
+                const ib = rankList.findIndex((r) =>
+                  matchRankName(b.title || "", r.name)
+                );
+                if (ia === -1 && ib === -1) return 0;
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              });
+            }
           }
           const newItems = results.map((item) => ({
             ...item,
