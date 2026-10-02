@@ -331,14 +331,7 @@ export default function HomeScreen() {
             {getApiConfigErrorMessage(apiConfigStatus)}
           </ThemedText>
         </View>
-      ) : apiConfigStatus.isValidating ? (
-        <View style={commonStyles.center}>
-          <ActivityIndicator size="large" />
-          <ThemedText type="subtitle" style={{ padding: spacing, textAlign: "center" }}>
-            正在验证服务器配置...
-          </ThemedText>
-        </View>
-      ) : apiConfigStatus.error && !apiConfigStatus.isValid ? (
+      ) : apiConfigStatus.error && !apiConfigStatus.isValid && !loading && !contentData.length ? (
         <View style={commonStyles.center}>
           <ThemedText type="subtitle" style={{ padding: spacing, textAlign: "center" }}>
             {apiConfigStatus.error}

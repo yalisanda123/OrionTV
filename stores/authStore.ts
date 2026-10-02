@@ -60,11 +60,14 @@ const useAuthStore = create<AuthState>((set) => ({
       const authToken = await AsyncStorage.getItem('authCookies');
       if (!authToken) {
         if (serverConfig && serverConfig.StorageType === "localstorage") {
-          const loginResult = await api.login().catch(() => {
-            set({ isLoggedIn: false, isLoginModalVisible: true });
-          });
+          // 本地存储模式：MoonTV 的 API 全部免登录（middleware 白名单），
+          // 自动 login() 无参必失败（密码不匹配），失败弹登录框是误报。
+          // 修复：localstorage 模式直接视为已登录，永不弹登录框。
+          const loginResult = await api.login().catch(() => null);
           if (loginResult && loginResult.ok) {
             set({ isLoggedIn: true });
+          } else {
+            set({ isLoggedIn: true, isLoginModalVisible: false });
           }
         } else {
           set({ isLoggedIn: false, isLoginModalVisible: true });
